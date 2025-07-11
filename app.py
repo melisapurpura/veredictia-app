@@ -65,11 +65,14 @@ st.write(
 )
 
 query = st.text_input(
-    label      = "Escribe tu pregunta:",
-    placeholder= "Ej: ¿Qué se resolvió en el caso de Equipos Médicos Peninsulares?"
+    label       = "Escribe tu pregunta:",
+    placeholder = "Ej: ¿Qué se resolvió en el caso de Equipos Médicos Peninsulares?"
 )
 
-if st.button("Buscar") and query:
+# 👉  Botón creado UNA sola vez
+search_pressed = st.button("Buscar", key="search_btn")
+
+if search_pressed and query:
     with st.spinner("Buscando…"):
         try:
             response = search_cases(query)
@@ -100,5 +103,6 @@ if st.button("Buscar") and query:
 
         except Exception as e:
             st.error(f"Ocurrió un error al contactar la API:\n\n{e}")
-elif st.button("Buscar"):
+
+elif search_pressed:
     st.warning("Por favor, escribe una pregunta antes de buscar.")
