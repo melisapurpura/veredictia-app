@@ -45,13 +45,6 @@ def search_cases(query: str):
     
     return client.search(request)
 
-# --- BLOQUE DE DEPURACIÓN ---
-st.subheader("Valores de Configuración en Uso:")
-st.write(f"Project ID: {PROJECT_ID}")
-st.write(f"Location: {LOCATION}")
-st.write(f"Data Store ID: {DATA_STORE_ID}")
-st.divider()
-# ----------------------------
 
 st.title("Buscador Legal IA ⚖️")
 
