@@ -2,107 +2,75 @@ import streamlit as st
 from google.oauth2 import service_account
 from google.cloud import discoveryengine_v1alpha as discoveryengine
 
-# ──────────────────────────────────────────────
-# 1. Cargar secretos y credenciales de GCP
-# ──────────────────────────────────────────────
-try:
-    gcp_creds_dict   = st.secrets["gcp"]["credentials"]
-    PROJECT_NUMBER   = st.secrets["gcp"]["project_number"]   # 107344050799
-    DATA_STORE_ID    = st.secrets["gcp"]["data_store_id"]    # casos-mvp_1752189050616
-except KeyError as e:
-    st.error(f"Falta la clave {e} en .streamlit/secrets.toml")
-    st.stop()
+# ── 1. Secrets ──────────────────────────────────────────────────────
+creds_info = st.secrets["gcp"]["credentials"]
+PROJECT_NUMBER = st.secrets["gcp"]["project_number"]           # 107344050799
+COLLECTION_ID  = st.secrets["gcp"]["collection_id"]           # casos-mvp_1752189050616
+DATA_STORE_ID  = st.secrets["gcp"]["data_store_id"]           # casos-mvp_1752189050616_gcs_store
+LOCATION       = "us"                                         # EXACTO como en consola
 
-credentials   = service_account.Credentials.from_service_account_info(gcp_creds_dict)
-LOCATION      = "global"    # El endpoint de búsqueda siempre usa global
+# ── 2. Cliente y serving_config (construido a mano) ────────────────
+credentials = service_account.Credentials.from_service_account_info(creds_info)
+client      = discoveryengine.SearchServiceClient(credentials=credentials)
 
-# ──────────────────────────────────────────────
-# 2. Crear cliente y ruta SERVING_CONFIG (una vez)
-# ──────────────────────────────────────────────
-@st.cache_resource(show_spinner=False)
-def get_client():
-    return discoveryengine.SearchServiceClient(credentials=credentials)
-
-client = get_client()
-
-SERVING_CONFIG = client.serving_config_path(
-    project        = PROJECT_NUMBER,
-    location       = LOCATION,
-    data_store     = DATA_STORE_ID,
-    serving_config = "default_search",          # Ver pestaña “Serving configs” en consola
+SERVING_CONFIG = (
+    f"projects/{PROJECT_NUMBER}"
+    f"/locations/{LOCATION}"
+    f"/collections/{COLLECTION_ID}"
+    f"/dataStores/{DATA_STORE_ID}"
+    f"/servingConfigs/default_search"       # o default_config, según tu consola
 )
 
-# ──────────────────────────────────────────────
-# 3. Lógica de búsqueda
-# ──────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
+def get_client():
+    return client
+
+# ── 3. Función de búsqueda ─────────────────────────────────────────
 def search_cases(query: str):
     request = discoveryengine.SearchRequest(
         serving_config = SERVING_CONFIG,
         query          = query,
         page_size      = 10,
         content_search_spec = {
-            "summary_spec": {
-                "summary_result_count": 3,
-                "model_prompt_spec": {
-                    "preamble": (
-                        "Resume el siguiente texto en español, con detalle, "
-                        "y tono de asistente legal."
-                    )
-                },
-            }
+            "summary_spec": {"summary_result_count": 3}
         },
     )
     return client.search(request)
 
-# ──────────────────────────────────────────────
-# 4. Interfaz Streamlit
-# ──────────────────────────────────────────────
+# ── 4. UI -----------------------------------------------------------
 st.title("⚖️ Buscador Legal IA")
-
-st.write(
-    "Haz una pregunta sobre los casos cargados. "
-    "Obtendrás un resumen generado por IA y los documentos relevantes."
-)
+st.write("Haz una pregunta y obtén jurisprudencia relevante.")
 
 query = st.text_input(
-    label       = "Escribe tu pregunta:",
-    placeholder = "Ej: ¿Qué se resolvió en el caso de Equipos Médicos Peninsulares?"
+    "Tu pregunta:",
+    placeholder="¿Qué precedentes existen sobre arrendamiento financiero?",
 )
-
-# 👉  Botón creado UNA sola vez
 search_pressed = st.button("Buscar", key="search_btn")
 
 if search_pressed and query:
-    with st.spinner("Buscando…"):
+    with st.spinner("Consultando Vertex AI Search…"):
         try:
             response = search_cases(query)
-
-            # ── Resumen ─────────────────────
-            summary_text = getattr(response.summary, "summary_text", "")
-            if summary_text:
-                st.subheader("Resumen:")
-                st.markdown(summary_text)
+            summary  = getattr(response.summary, "summary_text", "")
+            if summary:
+                st.subheader("Resumen")
+                st.markdown(summary)
             else:
-                st.info("No se pudo generar un resumen para esta consulta.")
-
-            # ── Resultados ──────────────────
+                st.info("No se generó resumen.")
             if response.results:
-                st.subheader("Documentos relevantes:")
-                for result in response.results:
-                    meta  = result.document.derived_struct_data
-                    title = meta.get("title", "Título no disponible")
+                st.subheader("Documentos")
+                for r in response.results:
+                    meta  = r.document.derived_struct_data
+                    title = meta.get("title", "Sin título")
                     link  = meta.get("link", "#")
-
                     with st.expander(title):
                         for snip in meta.get("snippets", []):
                             st.markdown(f"> …{snip.get('snippet', '')}…")
                         if link != "#":
-                            st.markdown(f"_[Abrir documento completo]({link})_")
+                            st.markdown(f"[Abrir documento]({link})")
             else:
-                st.warning("No se encontraron documentos para esa búsqueda.")
-
+                st.warning("Sin resultados.")
         except Exception as e:
-            st.error(f"Ocurrió un error al contactar la API:\n\n{e}")
-
+            st.error(f"Ocurrió un error:\n\n{e}")
 elif search_pressed:
-    st.warning("Por favor, escribe una pregunta antes de buscar.")
+    st.warning("Escribe primero tu pregunta.")
