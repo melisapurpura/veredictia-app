@@ -1,3 +1,4 @@
-streamlit
-google-cloud-discoveryengine>=0.13.0
+streamlit>=1.33
+google-cloud-discoveryengine==0.13.9   # versión donde v1alpha funciona bien
 google-auth
+google-auth-oauthlib
