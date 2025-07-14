@@ -33,7 +33,7 @@ def search_cases(query: str):
         serving_config = SERVING_CONFIG,
         query          = query,
         page_size      = 10,
-        guided_search_spec = {"enable_guided_search": True, "guided_search_result_count": 1},
+        guided_search_spec = {"enable_guided_search": True},
         content_search_spec = {"summary_spec": {"summary_result_count": 3}},
     )
     return client.search(request)
