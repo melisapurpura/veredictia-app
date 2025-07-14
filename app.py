@@ -55,7 +55,7 @@ def search_cases(query: str):
                     )
                 }
             },
-            "language_code": "es"          # fuerza español
+            
         },
         # guided_search_spec (follow-ups) no disponible aún en 0.13.x
     )
